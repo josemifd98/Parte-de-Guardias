@@ -1,0 +1,2300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parte de Guardias - Urgencias Lab</title>
+    <!-- Firebase App y Firestore (Versión Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+    <!-- XLSX para importar/exportar Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* ESTILOS DE LOGIN */
+        #loginOverlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 460px;
+            text-align: center;
+            max-height: 95vh;
+            overflow-y: auto;
+        }
+
+        .login-photo-container {
+            width: 100%;
+            height: 260px;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .login-photo-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: grayscale(100%) contrast(110%);
+            transition: filter 0.3s ease;
+        }
+
+        .login-photo-container img:hover {
+            filter: grayscale(0%) contrast(100%);
+        }
+
+        .login-card h2 {
+            margin-bottom: 5px;
+            color: #333;
+            font-size: 22px;
+        }
+
+        .login-card p {
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 15px;
+        }
+
+        .memorial-quote {
+            font-style: italic;
+            color: #4a5568;
+            font-size: 13px;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .memorial-subtitle {
+            font-size: 11px;
+            color: #718096;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .error-msg {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 15px;
+            display: none;
+            border: 1px solid #f5c6cb;
+        }
+
+        /* CONTENEDOR PRINCIPAL APP */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            display: none;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .btn-logout {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .banner-import {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            padding: 15px 30px;
+            text-align: center;
+            font-weight: 600;
+            display: none;
+        }
+
+        .banner-sync {
+            background: #cce5ff;
+            border: 1px solid #b3d9ff;
+            color: #004085;
+            padding: 12px 30px;
+            text-align: center;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .sync-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #004085;
+            border-radius: 50%;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            min-height: 600px;
+        }
+
+        .panel-izquierdo {
+            background: #f8f9fa;
+            padding: 30px;
+            border-right: 1px solid #e9ecef;
+            overflow-y: auto;
+            max-height: 800px;
+        }
+
+        .panel-derecho {
+            padding: 30px;
+            overflow-y: auto;
+            max-height: 800px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        input[type="date"],
+        input[type="text"],
+        input[type="password"],
+        input[type="file"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        input[type="date"]:focus,
+        input[type="text"]:focus,
+        input[type="password"]:focus,
+        input[type="file"]:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .turnos {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .turno-btn {
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            font-size: 13px;
+        }
+
+        .turno-btn:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .turno-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
+        }
+
+        .categorias {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .categoria-btn {
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 12px;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .categoria-btn:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .categoria-btn.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        #subcategoriasAparato {
+            background: linear-gradient(180deg, #ffffff 0%, #f7f8ff 100%);
+            border: 1px solid #e3e7f7;
+            border-radius: 14px;
+            padding: 16px;
+            margin-top: -4px;
+            box-shadow: 0 6px 18px rgba(55, 65, 81, 0.07);
+            display: none;
+            margin-bottom: 20px;
+        }
+
+        .subcategorias-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 9px;
+        }
+
+        .subcategoria-btn {
+            position: relative;
+            min-height: 45px;
+            padding: 8px 10px;
+            border: 1.5px solid #dfe3ef;
+            background: #fff;
+            color: #374151;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 12px;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .subcategoria-btn:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .subcategoria-btn.active {
+            background: #667eea;
+            border-color: #667eea;
+            color: white;
+        }
+
+        /* ESTILOS PARA SUBSUBCATEGORÍAS */
+        .subsubcategorias-container {
+            background: #f0f7ff;
+            border: 1px solid #c3d9f7;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+            display: none;
+        }
+
+        .subsubcategorias-container label {
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .subsubcategorias-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+        }
+
+        .subsubcategoria-btn {
+            padding: 8px 10px;
+            border: 1px solid #b3d9f7;
+            background: white;
+            color: #0066cc;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 11px;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .subsubcategoria-btn:hover {
+            background: #e3f2fd;
+            border-color: #667eea;
+        }
+
+        .subsubcategoria-btn.active {
+            background: #0066cc;
+            color: white;
+            border-color: #0066cc;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #e9ecef;
+            color: #333;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-info:hover {
+            background: #138496;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+
+        .button-group .btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 10px;
+            font-size: 12px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 26px;
+            font-weight: bold;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .filtros-header {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .filtro-group {
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .filtro-group label {
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+
+        .acciones-masivas {
+            background: #f1f3f5;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+        }
+
+        .tarjeta-incidencia {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .tarjeta-incidencia:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .tarjeta-incidencia.cerrado {
+            background: #f8f9fa;
+            opacity: 0.8;
+        }
+
+        .tarjeta-select-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+
+        .tarjeta-select-container input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .tarjeta-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-right: 30px;
+        }
+
+        .tarjeta-fecha {
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .tarjeta-turno {
+            color: #667eea;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .tarjeta-estado {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 25px;
+        }
+
+        .estado-pendiente {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .estado-cerrado {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .tarjeta-persona {
+            color: #0066cc;
+            font-weight: 500;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .tarjeta-auditoria {
+            background: #f0f7ff;
+            border-left: 3px solid #0066cc;
+            color: #004085;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 8px 0;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        .tarjeta-categoria {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            display: inline-block;
+        }
+
+        .tarjeta-subcategoria {
+            background: #f3e5f5;
+            color: #6a1b9a;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin: 8px 4px 8px 0;
+            font-size: 12px;
+            font-weight: 500;
+            display: inline-block;
+        }
+
+        .tarjeta-subsubcategoria {
+            background: #e0f7fa;
+            color: #006064;
+            padding: 3px 6px;
+            border-radius: 3px;
+            margin: 6px 4px 6px 0;
+            font-size: 11px;
+            font-weight: 500;
+            display: inline-block;
+        }
+
+        .tarjeta-peticion {
+            background: #c8e6c9;
+            color: #2e7d32;
+            padding: 6px 10px;
+            border-radius: 4px;
+            margin: 8px 0;
+            font-size: 12px;
+            font-weight: 500;
+            display: inline-block;
+        }
+
+        .tarjeta-descripcion {
+            color: #333;
+            margin: 12px 0 8px 0;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .tarjeta-comentarios {
+            background: #fff9e6;
+            border-left: 3px solid #ffc107;
+            color: #856404;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 8px 0;
+            font-size: 12px;
+        }
+
+        .botones-accion {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .btn-edit {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .config-section {
+            background: #f0f4ff;
+            border: 1px solid #e0e7ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+
+        .config-section.success {
+            background: #f0fff4;
+            border-color: #9ae6b4;
+            color: #22543d;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+
+        /* ESTILOS PARA POP-UP DE ÚLTIMOS 3 DÍAS */
+        .floating-widget {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 350px;
+            max-height: 500px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            z-index: 900;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+        }
+
+        .floating-widget.minimized {
+            width: auto;
+            max-height: auto;
+            bottom: auto;
+            top: 20px;
+            right: 20px;
+        }
+
+        .floating-widget-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+        }
+
+        .floating-widget.minimized .floating-widget-header {
+            border-radius: 12px;
+        }
+
+        .floating-widget-content {
+            padding: 15px;
+            overflow-y: auto;
+            flex: 1;
+            max-height: 400px;
+        }
+
+        .floating-widget.minimized .floating-widget-content {
+            display: none;
+        }
+
+        .widget-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .widget-tab {
+            padding: 8px 12px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .widget-tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .widget-incident-item {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 11px;
+            border-left: 3px solid #667eea;
+        }
+
+        .widget-incident-item.cerrado {
+            border-left-color: #28a745;
+        }
+
+        .widget-incident-fecha {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .widget-incident-persona {
+            color: #0066cc;
+            font-weight: 500;
+        }
+
+        .widget-minimize-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .widget-minimize-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .widget-empty {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 12px;
+        }
+
+        /* Estilos del modal de edición mejorado */
+        .edit-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .edit-tab {
+            padding: 8px 12px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 12px;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .edit-tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .edit-tab-content {
+            display: none;
+        }
+
+        .edit-tab-content.active {
+            display: block;
+        }
+
+        .user-selector {
+            background: #f0f7ff;
+            border: 1px solid #c3d9f7;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+        }
+
+        .user-selector label {
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .user-info {
+            background: #f0fff4;
+            border-left: 3px solid #22543d;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .panel-izquierdo {
+                border-right: none;
+                border-bottom: 1px solid #e9ecef;
+                max-height: none;
+            }
+
+            .floating-widget {
+                width: 280px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- PANTALLA DE LOGIN -->
+    <div id="loginOverlay">
+        <div class="login-card">
+            <div class="login-photo-container">
+                <img src="1199b6b8-32bf-4731-bbbe-478b46393631.jpg" alt="En memoria de los resis">
+            </div>
+            
+            <p class="memorial-quote">"Podrás salir de Basurto, pero Basurto nunca saldrá de ti"</p>
+            <p class="memorial-subtitle">En memoria de los resis</p>
+
+            <h2>🔒 Acceso Restringido</h2>
+            <p>Parte de Guardias - Urgencias Lab</p>
+            <div id="loginError" class="error-msg"></div>
+            <form id="loginForm">
+                <div class="form-group" style="text-align: left;">
+                    <label for="usuario">Usuario</label>
+                    <input type="text" id="usuario" required placeholder="Introduce usuario">
+                </div>
+                <div class="form-group" style="text-align: left;">
+                    <label for="contraseña">Contraseña</label>
+                    <input type="password" id="contraseña" required placeholder="Introduce contraseña">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Entrar al Sistema</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- CONTENEDOR PRINCIPAL DE LA APLICACIÓN -->
+    <div class="container" id="appContainer">
+        <!-- HEADER -->
+        <div class="header">
+            <button class="btn-logout" onclick="cerrarSesion()">🚪 Cerrar Sesión</button>
+            <h1>📋 Parte de Guardias - Urgencias Lab</h1>
+            <p>Sistema de registro de incidencias con sincronización en tiempo real</p>
+        </div>
+
+        <!-- BANNER SINCRONIZACIÓN -->
+        <div class="banner-sync">
+            <span class="sync-indicator"></span>
+            Sincronizando datos con la nube en tiempo real...
+        </div>
+
+        <!-- BANNER IMPORTACIÓN -->
+        <div id="bannerImport" class="banner-import">
+            ✅ Datos importados correctamente y guardados en la nube
+        </div>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <div class="main-content">
+            <!-- PANEL IZQUIERDO: FORMULARIO -->
+            <div class="panel-izquierdo">
+                <div id="firebaseConfig" class="config-section">
+                    ⚠️ Conectando con la base de datos...
+                </div>
+
+                <h3 style="margin-bottom: 20px;">📝 Registrar Incidencia</h3>
+                
+                <div class="form-group">
+                    <label for="fecha">📅 Fecha</label>
+                    <input type="date" id="fecha" required>
+                </div>
+
+                <div class="form-group">
+                    <label>🕐 Turno</label>
+                    <div class="turnos" id="turnosContainer">
+                        <button type="button" class="turno-btn" data-turno="Mañana">🌅 Mañana</button>
+                        <button type="button" class="turno-btn" data-turno="Tarde">☀️ Tarde</button>
+                        <button type="button" class="turno-btn" data-turno="Noche">🌙 Noche</button>
+                        <button type="button" class="turno-btn" data-turno="24h">📅 24h</button>
+                        <button type="button" class="turno-btn" data-turno="Finde Mañana">🌞 Finde M.</button>
+                        <button type="button" class="turno-btn" data-turno="Finde Noche">⭐ Finde N.</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="persona">👤 Persona en turno</label>
+                    <select id="persona" required>
+                        <option value="">Selecciona...</option>
+                        <option value="Alex">Alex</option>
+                        <option value="Amaya">Amaya</option>
+                        <option value="Lara">Lara</option>
+                        <option value="Alaitz">Alaitz</option>
+                        <option value="Elene">Elene</option>
+                        <option value="Laura">Laura</option>
+                        <option value="Edu">Edu</option>
+                        <option value="Residente">Residente</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>📌 Categoría</label>
+                    <div class="categorias" id="categoriasContainer">
+                        <button type="button" class="categoria-btn" data-categoria="Aparato">⚙️ Aparato</button>
+                        <button type="button" class="categoria-btn" data-categoria="Analítica">🧪 Analítica</button>
+                        <button type="button" class="categoria-btn" data-categoria="Informática">💻 Informática</button>
+                        <button type="button" class="categoria-btn" data-categoria="Mantenimiento/Giroa">🔧 Mto./Giroa</button>
+                        <button type="button" class="categoria-btn" data-categoria="Otro">📌 Otro</button>
+                    </div>
+                </div>
+
+                <div id="subcategoriasAparato">
+                    <label style="color: #4f46e5; margin-bottom: 10px;">⚙️ Selecciona subcategoría</label>
+                    <div class="subcategorias-grid">
+                        <button type="button" class="subcategoria-btn" data-subcategoria="Cadena">Cadena</button>
+                        <button type="button" class="subcategoria-btn" data-subcategoria="Sysmex">Sysmex</button>
+                        <button type="button" class="subcategoria-btn" data-subcategoria="Coagulación">Coagulación</button>
+                        <button type="button" class="subcategoria-btn" data-subcategoria="Orinas">Orinas</button>
+                        <button type="button" class="subcategoria-btn" data-subcategoria="Drogas">Drogas</button>
+                        <button type="button" class="subcategoria-btn" data-subcategoria="Gasómetros">Gasómetros</button>
+                        <button type="button" class="subcategoria-btn" data-subcategoria="Otro">Otro</button>
+                    </div>
+
+                    <!-- SUBSUBCATEGORÍAS DINÁMICAS PARA CADENA -->
+                    <div id="subsubcategoriaCadena" class="subsubcategorias-container">
+                        <label>Selecciona tipo de procedimiento:</label>
+                        <div class="subsubcategorias-grid">
+                            <button type="button" class="subsubcategoria-btn" data-subsubcategoria="Rutina">Rutina</button>
+                            <button type="button" class="subsubcategoria-btn" data-subsubcategoria="Urgencias">Urgencias</button>
+                            <button type="button" class="subsubcategoria-btn" data-subsubcategoria="Preanalítica">Preanalítica</button>
+                        </div>
+                        <div id="subsubsubcategoriaRutinaContainer" class="subsubcategorias-container" style="margin-top: 10px;">
+                            <label>Equipo:</label>
+                            <div class="subsubcategorias-grid">
+                                <button type="button" class="subsubcategoria-btn" data-subsubsubcategoria="ISE">ISE</button>
+                                <button type="button" class="subsubcategoria-btn" data-subsubsubcategoria="C3">C3</button>
+                                <button type="button" class="subsubcategoria-btn" data-subsubsubcategoria="C4">C4</button>
+                                <button type="button" class="subsubcategoria-btn" data-subsubsubcategoria="F4">F4</button>
+                            </div>
+                        </div>
+                        <div id="subsubsubcategoriaUrgenciasContainer" class="subsubcategorias-container" style="margin-top: 10px;">
+                            <label>Equipo:</label>
+                            <div class="subsubcategorias-grid">
+                                <button type="button" class="subsubcategoria-btn" data-subsubsubcategoria="ISE">ISE</button>
+                                <button type="button" class="subsubcategoria-btn" data-subsubsubcategoria="C1">C1</button>
+                                <button type="button" class="subsubcategoria-btn" data-subsubsubcategoria="C2">C2</button>
+                                <button type="button" class="subsubcategoria-btn" data-subsubsubcategoria="C5">C5</button>
+                                <button type="button" class="subsubcategoria-btn" data-subsubsubcategoria="F5">F5</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SUBSUBCATEGORÍAS DINÁMICAS PARA SYSMEX -->
+                    <div id="subsubcategoriaSysmex" class="subsubcategorias-container">
+                        <label>Posición:</label>
+                        <div class="subsubcategorias-grid">
+                            <button type="button" class="subsubcategoria-btn" data-subsubcategoria="Izquierdo">Izquierdo</button>
+                            <button type="button" class="subsubcategoria-btn" data-subsubcategoria="Derecho">Derecho</button>
+                        </div>
+                    </div>
+
+                    <!-- SUBSUBCATEGORÍAS DINÁMICAS PARA COAGULACIÓN -->
+                    <div id="subsubcategoriaCoagulación" class="subsubcategorias-container">
+                        <label>Equipo:</label>
+                        <div class="subsubcategorias-grid">
+                            <button type="button" class="subsubcategoria-btn" data-subsubcategoria="Coagulómetro 1">Coagulómetro 1</button>
+                            <button type="button" class="subsubcategoria-btn" data-subsubcategoria="Coagulómetro 2">Coagulómetro 2</button>
+                        </div>
+                    </div>
+
+                    <!-- SUBSUBCATEGORÍAS DINÁMICAS PARA GASÓMETROS -->
+                    <div id="subsubcategoriaGasómetros" class="subsubcategorias-container">
+                        <label>Equipo:</label>
+                        <div class="subsubcategorias-grid">
+                            <button type="button" class="subsubcategoria-btn" data-subsubcategoria="Gasómetro 1">Gasómetro 1</button>
+                            <button type="button" class="subsubcategoria-btn" data-subsubcategoria="Gasómetro 2">Gasómetro 2</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group" id="numeroPeticionDiv" style="display: none;">
+                    <label for="numeroPeticion">🔢 Número de Petición</label>
+                    <input type="text" id="numeroPeticion" placeholder="Ej: 50416297">
+                </div>
+
+                <div class="form-group">
+                    <label for="descripcion">📄 Descripción</label>
+                    <textarea id="descripcion" required placeholder="Describe la incidencia..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="comentarios">💬 Comentarios (opcional)</label>
+                    <textarea id="comentarios" placeholder="Comentarios adicionales..."></textarea>
+                </div>
+
+                <button class="btn btn-primary" style="width: 100%; margin-bottom: 20px;" onclick="guardarIncidencia()">
+                    ✅ Guardar Incidencia
+                </button>
+
+                <div class="button-group">
+                    <button class="btn btn-success" onclick="exportarExcel()">📊 Exportar</button>
+                    <button class="btn btn-info" onclick="document.getElementById('importFile').click()">📥 Importar</button>
+                    <input type="file" id="importFile" accept=".xlsx,.xls,.csv" style="display: none;" onchange="importarExcel(event)">
+                </div>
+
+                <div style="margin-bottom: 20px;">
+                    <button class="btn btn-danger" style="width: 100%;" onclick="eliminarTodasLasIncidencias()">
+                        🗑️ Eliminar todas las incidencias
+                    </button>
+                </div>
+
+                <div class="stats">
+                    <div class="stat-box">
+                        <span class="stat-number" id="statTotal">0</span>
+                        <span class="stat-label">Total</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-number" id="statPendiente">0</span>
+                        <span class="stat-label">Pendientes</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANEL DERECHO: LISTA DE INCIDENCIAS -->
+            <div class="panel-derecho">
+                <h3 style="margin-bottom: 20px;">📋 Incidencias</h3>
+
+                <div class="filtros-header">
+                    <div class="filtro-group">
+                        <label>🔍 Buscar</label>
+                        <input type="text" id="filtroSearch" placeholder="Busca por descripción..." oninput="renderizar()">
+                    </div>
+                    <div class="filtro-group">
+                        <label>🔄 Ordenar</label>
+                        <select id="filtroOrdenacion" onchange="renderizar()">
+                            <option value="reciente">Más Reciente</option>
+                            <option value="antiguo">Más Antiguo</option>
+                        </select>
+                    </div>
+                    <div class="filtro-group">
+                        <label>📊 Estado</label>
+                        <select id="filtroEstado" onchange="renderizar()">
+                            <option value="">Todos</option>
+                            <option value="PENDIENTE">Pendientes</option>
+                            <option value="CERRADO">Cerrados</option>
+                        </select>
+                    </div>
+                    <div class="filtro-group">
+                        <label>📌 Categoría</label>
+                        <select id="filtroCategoria" onchange="actualizarFiltroSubcategoria(); renderizar()">
+                            <option value="">Todas</option>
+                            <option value="Aparato">⚙️ Aparato</option>
+                            <option value="Analítica">🧪 Analítica</option>
+                            <option value="Informática">💻 Informática</option>
+                            <option value="Mantenimiento/Giroa">🔧 Mto./Giroa</option>
+                            <option value="Otro">📌 Otro</option>
+                        </select>
+                    </div>
+                    <div class="filtro-group" id="filtroSubcategoriaDiv" style="display: none;">
+                        <label>⚙️ Subcategoría</label>
+                        <select id="filtroSubcategoria" onchange="actualizarFiltroSubsubcategoria(); renderizar()">
+                            <option value="">Todas</option>
+                            <option value="Cadena">Cadena</option>
+                            <option value="Sysmex">Sysmex</option>
+                            <option value="Coagulación">Coagulación</option>
+                            <option value="Orinas">Orinas</option>
+                            <option value="Drogas">Drogas</option>
+                            <option value="Gasómetros">Gasómetros</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="filtro-group" id="filtroSubsubcategoriaDiv" style="display: none;">
+                        <label>🔹 Equipo</label>
+                        <select id="filtroSubsubcategoria" onchange="renderizar()">
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="acciones-masivas">
+                    <div>
+                        <input type="checkbox" id="seleccionarTodo" onchange="toggleSeleccionarTodo(this)">
+                        <label for="seleccionarTodo" style="display: inline; margin-left: 5px;">Seleccionar todo</label>
+                    </div>
+                    <button class="btn btn-danger" onclick="eliminarSeleccionadas()" style="padding: 6px 12px; font-size: 12px;">🗑️ Eliminar seleccionadas</button>
+                </div>
+
+                <div id="incidenciasList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE EDICIÓN -->
+    <div id="modalEdicion" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">✏️ Editar Incidencia</div>
+            
+            <form id="formEdicion" onsubmit="guardarEdicion(event)">
+                <!-- TABS EN MODAL -->
+                <div class="edit-tabs">
+                    <button type="button" class="edit-tab active" onclick="switchEditTab('datos')">Datos</button>
+                    <button type="button" class="edit-tab" onclick="switchEditTab('auditoria')">Modificación</button>
+                </div>
+
+                <!-- TAB: DATOS -->
+                <div id="tab-datos" class="edit-tab-content active">
+                    <div class="form-group">
+                        <label for="editFecha">📅 Fecha</label>
+                        <input type="date" id="editFecha" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>🕐 Turno</label>
+                        <div class="turnos">
+                            <button type="button" class="edit-turno-btn" data-turno="Mañana">🌅 Mañana</button>
+                            <button type="button" class="edit-turno-btn" data-turno="Tarde">☀️ Tarde</button>
+                            <button type="button" class="edit-turno-btn" data-turno="Noche">🌙 Noche</button>
+                            <button type="button" class="edit-turno-btn" data-turno="24h">📅 24h</button>
+                            <button type="button" class="edit-turno-btn" data-turno="Finde Mañana">🌞 Finde M.</button>
+                            <button type="button" class="edit-turno-btn" data-turno="Finde Noche">⭐ Finde N.</button>
+                        </div>
+                        <input type="hidden" id="editTurno">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editPersona">👤 Persona en turno</label>
+                        <select id="editPersona" required>
+                            <option value="">Selecciona...</option>
+                            <option value="Alex">Alex</option>
+                            <option value="Amaya">Amaya</option>
+                            <option value="Lara">Lara</option>
+                            <option value="Alaitz">Alaitz</option>
+                            <option value="Elene">Elene</option>
+                            <option value="Laura">Laura</option>
+                            <option value="Edu">Edu</option>
+                            <option value="Residente">Residente</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>📌 Categoría</label>
+                        <div class="categorias">
+                            <button type="button" class="edit-categoria-btn" data-categoria="Aparato">⚙️ Aparato</button>
+                            <button type="button" class="edit-categoria-btn" data-categoria="Analítica">🧪 Analítica</button>
+                            <button type="button" class="edit-categoria-btn" data-categoria="Informática">💻 Informática</button>
+                            <button type="button" class="edit-categoria-btn" data-categoria="Mantenimiento/Giroa">🔧 Mto./Giroa</button>
+                            <button type="button" class="edit-categoria-btn" data-categoria="Otro">📌 Otro</button>
+                        </div>
+                        <input type="hidden" id="editCategoria">
+                    </div>
+
+                    <div class="form-group" id="editSubcategoriasAparatoDiv" style="display: none;">
+                        <label>⚙️ Subcategoría de Aparato</label>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <button type="button" class="edit-subcategoria-btn" data-subcategoria="Cadena">Cadena</button>
+                            <button type="button" class="edit-subcategoria-btn" data-subcategoria="Sysmex">Sysmex</button>
+                            <button type="button" class="edit-subcategoria-btn" data-subcategoria="Coagulación">Coagulación</button>
+                            <button type="button" class="edit-subcategoria-btn" data-subcategoria="Orinas">Orinas</button>
+                            <button type="button" class="edit-subcategoria-btn" data-subcategoria="Drogas">Drogas</button>
+                            <button type="button" class="edit-subcategoria-btn" data-subcategoria="Gasómetros">Gasómetros</button>
+                            <button type="button" class="edit-subcategoria-btn" data-subcategoria="Otro">Otro</button>
+                        </div>
+                        <input type="hidden" id="editSubcategoria">
+
+                        <!-- SUBSUBCATEGORÍAS EN MODAL -->
+                        <div id="editSubsubcategoriaCadena" class="subsubcategorias-container">
+                            <label style="font-size: 12px;">Tipo de procedimiento:</label>
+                            <div class="subsubcategorias-grid">
+                                <button type="button" class="edit-subsubcategoria-btn" data-subsubcategoria="Rutina">Rutina</button>
+                                <button type="button" class="edit-subsubcategoria-btn" data-subsubcategoria="Urgencias">Urgencias</button>
+                                <button type="button" class="edit-subsubcategoria-btn" data-subsubcategoria="Preanalítica">Preanalítica</button>
+                            </div>
+                            <div id="editSubsubsubcategoriaRutinaContainer" class="subsubcategorias-container" style="margin-top: 10px;">
+                                <label style="font-size: 11px;">Equipo:</label>
+                                <div class="subsubcategorias-grid">
+                                    <button type="button" class="edit-subsubcategoria-btn" data-subsubsubcategoria="ISE">ISE</button>
+                                    <button type="button" class="edit-subsubcategoria-btn" data-subsubsubcategoria="C3">C3</button>
+                                    <button type="button" class="edit-subsubcategoria-btn" data-subsubsubcategoria="C4">C4</button>
+                                    <button type="button" class="edit-subsubcategoria-btn" data-subsubsubcategoria="F4">F4</button>
+                                </div>
+                            </div>
+                            <div id="editSubsubsubcategoriaUrgenciasContainer" class="subsubcategorias-container" style="margin-top: 10px;">
+                                <label style="font-size: 11px;">Equipo:</label>
+                                <div class="subsubcategorias-grid">
+                                    <button type="button" class="edit-subsubcategoria-btn" data-subsubsubcategoria="ISE">ISE</button>
+                                    <button type="button" class="edit-subsubcategoria-btn" data-subsubsubcategoria="C1">C1</button>
+                                    <button type="button" class="edit-subsubcategoria-btn" data-subsubsubcategoria="C2">C2</button>
+                                    <button type="button" class="edit-subsubcategoria-btn" data-subsubsubcategoria="C5">C5</button>
+                                    <button type="button" class="edit-subsubcategoria-btn" data-subsubsubcategoria="F5">F5</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="editSubsubcategoriaSysmex" class="subsubcategorias-container">
+                            <label style="font-size: 12px;">Posición:</label>
+                            <div class="subsubcategorias-grid">
+                                <button type="button" class="edit-subsubcategoria-btn" data-subsubcategoria="Izquierdo">Izquierdo</button>
+                                <button type="button" class="edit-subsubcategoria-btn" data-subsubcategoria="Derecho">Derecho</button>
+                            </div>
+                        </div>
+
+                        <div id="editSubsubcategoriaCoagulación" class="subsubcategorias-container">
+                            <label style="font-size: 12px;">Equipo:</label>
+                            <div class="subsubcategorias-grid">
+                                <button type="button" class="edit-subsubcategoria-btn" data-subsubcategoria="Coagulómetro 1">Coagulómetro 1</button>
+                                <button type="button" class="edit-subsubcategoria-btn" data-subsubcategoria="Coagulómetro 2">Coagulómetro 2</button>
+                            </div>
+                        </div>
+
+                        <div id="editSubsubcategoriaGasómetros" class="subsubcategorias-container">
+                            <label style="font-size: 12px;">Equipo:</label>
+                            <div class="subsubcategorias-grid">
+                                <button type="button" class="edit-subsubcategoria-btn" data-subsubcategoria="Gasómetro 1">Gasómetro 1</button>
+                                <button type="button" class="edit-subsubcategoria-btn" data-subsubcategoria="Gasómetro 2">Gasómetro 2</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="editNumeroPeticionDiv" style="display: none;">
+                        <label for="editNumeroPeticion">🔢 Número de Petición</label>
+                        <input type="text" id="editNumeroPeticion" placeholder="Ej: 50416297">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editDescripcion">📄 Descripción</label>
+                        <textarea id="editDescripcion" required></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editComentarios">💬 Comentarios</label>
+                        <textarea id="editComentarios"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editEstado">📊 Estado</label>
+                        <select id="editEstado" required>
+                            <option value="PENDIENTE">PENDIENTE</option>
+                            <option value="CERRADO">CERRADO</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- TAB: AUDITORÍA -->
+                <div id="tab-auditoria" class="edit-tab-content">
+                    <div class="user-selector">
+                        <label for="editModificadoPor">👤 ¿Quién realiza este cambio?</label>
+                        <select id="editModificadoPor" required>
+                            <option value="">Selecciona tu nombre...</option>
+                            <option value="Alex">Alex</option>
+                            <option value="Amaya">Amaya</option>
+                            <option value="Lara">Lara</option>
+                            <option value="Alaitz">Alaitz</option>
+                            <option value="Elene">Elene</option>
+                            <option value="Laura">Laura</option>
+                            <option value="Edu">Edu</option>
+                            <option value="Residente">Residente</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+
+                    <div class="user-info" id="auditoriInfo">
+                        <strong>Información de la incidencia:</strong><br>
+                        <span id="infoCreada">Creada por: (cargando...)</span><br>
+                        <span id="infoModificada">Nunca ha sido modificada</span><br>
+                        <span id="infoCerrada" style="display: none;">Cerrada por: (información disponible)</span>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-bottom: 10px;">✅ Guardar Cambios</button>
+                <button type="button" class="btn btn-secondary" style="width: 100%;" onclick="cerrarModal()">❌ Cancelar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- WIDGET FLOTANTE DE ÚLTIMOS 3 DÍAS -->
+    <div id="floatingWidget" class="floating-widget">
+        <div class="floating-widget-header">
+            <span>📅 Últimos 3 Días</span>
+            <button class="widget-minimize-btn" onclick="toggleWidgetMinimize()">−</button>
+        </div>
+        <div class="floating-widget-content">
+            <div class="widget-tabs">
+                <button class="widget-tab active" onclick="switchWidgetTab('abiertas')">Abiertas</button>
+                <button class="widget-tab" onclick="switchWidgetTab('cerradas')">Cerradas</button>
+            </div>
+            <div id="widget-abiertas" class="widget-tab-content active">
+                <!-- Se llena dinámicamente -->
+            </div>
+            <div id="widget-cerradas" class="widget-tab-content">
+                <!-- Se llena dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT DE LÓGICA Y FIREBASE -->
+    <script>
+        // Configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCrkTYQxXK1b5C1pDw-Tv2FnVfx-Ub5y64",
+            authDomain: "urgencias-lab.firebaseapp.com",
+            projectId: "urgencias-lab",
+            storageBucket: "urgencias-lab.firebasestorage.app",
+            messagingSenderId: "701654706691",
+            appId: "1:701654706691:web:fef04e664f560f3b5ebc36",
+            measurementId: "G-KGRHRJ07VG"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Estructura de datos para las subsubcategorías
+        const subsubcategoriasData = {
+            'Cadena': {
+                'Rutina': ['ISE', 'C3', 'C4', 'F4'],
+                'Urgencias': ['ISE', 'C1', 'C2', 'C5', 'F5'],
+                'Preanalítica': []
+            },
+            'Sysmex': {
+                'default': ['Izquierdo', 'Derecho']
+            },
+            'Coagulación': {
+                'default': ['1', '2']
+            },
+            'Gasómetros': {
+                'default': ['1', '2']
+            }
+        };
+
+        let estadoApp = {
+            turnoSeleccionado: '',
+            categoriaSeleccionada: '',
+            subcategoriaSeleccionada: '',
+            subsubcategoriaSeleccionada: '',
+            incidencias: [],
+            incidenciaEnEdicion: null,
+            usuarioActual: localStorage.getItem('usuarioActual') || ''
+        };
+
+        // Función Auxiliar para formatear fecha
+        function formatearFecha(fechaStr) {
+            if (!fechaStr) return '';
+            const partes = fechaStr.split('-');
+            if (partes.length === 3) {
+                return `${partes[2]}/${partes[1]}/${partes[0]}`;
+            }
+            return fechaStr;
+        }
+
+        function formatearFechaConHora(fechaIsoStr) {
+            if (!fechaIsoStr) return '';
+            const fecha = new Date(fechaIsoStr);
+            const dia = String(fecha.getDate()).padStart(2, '0');
+            const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+            const año = fecha.getFullYear();
+            const horas = String(fecha.getHours()).padStart(2, '0');
+            const minutos = String(fecha.getMinutes()).padStart(2, '0');
+            return `${dia}/${mes}/${año} ${horas}:${minutos}`;
+        }
+
+        // Funciones de widget flotante
+        function toggleWidgetMinimize() {
+            const widget = document.getElementById('floatingWidget');
+            widget.classList.toggle('minimized');
+        }
+
+        function switchWidgetTab(tab) {
+            document.querySelectorAll('.widget-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.widget-tab-content').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(`widget-${tab}`).classList.add('active');
+            actualizarWidgetUltimos3Dias();
+        }
+
+        // Función para actualizar el widget de últimos 3 días
+        function actualizarWidgetUltimos3Dias() {
+            const hoy = new Date();
+            const hace3Dias = new Date(hoy.getTime() - 3 * 24 * 60 * 60 * 1000);
+            
+            const incidenciasUltimos3Dias = estadoApp.incidencias.filter(inc => {
+                const fechaInc = new Date(inc.fechaCreacion || inc.fecha);
+                return fechaInc >= hace3Dias && fechaInc <= hoy;
+            });
+
+            const abiertas = incidenciasUltimos3Dias.filter(inc => inc.estado === 'PENDIENTE');
+            const cerradas = incidenciasUltimos3Dias.filter(inc => inc.estado === 'CERRADO');
+
+            // Llenar tab de abiertas
+            const widgetAbiertas = document.getElementById('widget-abiertas');
+            if (abiertas.length === 0) {
+                widgetAbiertas.innerHTML = '<div class="widget-empty">Sin incidencias abiertas</div>';
+            } else {
+                widgetAbiertas.innerHTML = abiertas.map(inc => `
+                    <div class="widget-incident-item">
+                        <div class="widget-incident-fecha">📅 ${formatearFecha(inc.fecha)}</div>
+                        <div class="widget-incident-persona">👤 ${inc.persona}</div>
+                        <div style="font-size: 10px; color: #666; margin-top: 4px;">📌 ${inc.categoria}</div>
+                        ${inc.subcategoria ? `<div style="font-size: 10px; color: #666;">⚙️ ${inc.subcategoria}</div>` : ''}
+                        <div style="font-size: 10px; margin-top: 4px; line-height: 1.3;">${inc.descripcion.substring(0, 50)}...</div>
+                    </div>
+                `).join('');
+            }
+
+            // Llenar tab de cerradas
+            const widgetCerradas = document.getElementById('widget-cerradas');
+            if (cerradas.length === 0) {
+                widgetCerradas.innerHTML = '<div class="widget-empty">Sin incidencias cerradas</div>';
+            } else {
+                widgetCerradas.innerHTML = cerradas.map(inc => `
+                    <div class="widget-incident-item cerrado">
+                        <div class="widget-incident-fecha">📅 ${formatearFecha(inc.fecha)}</div>
+                        <div class="widget-incident-persona">👤 ${inc.persona}</div>
+                        <div style="font-size: 10px; color: #666; margin-top: 4px;">📌 ${inc.categoria}</div>
+                        ${inc.subcategoria ? `<div style="font-size: 10px; color: #666;">⚙️ ${inc.subcategoria}</div>` : ''}
+                        <div style="font-size: 10px; margin-top: 4px; line-height: 1.3;">${inc.descripcion.substring(0, 50)}...</div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // ===== INICIALIZACIÓN DEL LOGIN =====
+        document.addEventListener('DOMContentLoaded', () => {
+            verificarAutenticacion();
+            
+            const formularioLogin = document.getElementById('loginForm');
+            if (formularioLogin) {
+                formularioLogin.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    
+                    const usuario = document.getElementById('usuario').value.trim();
+                    const contraseña = document.getElementById('contraseña').value;
+                    const errorDiv = document.getElementById('loginError');
+                    
+                    if (usuario === 'URG' && contraseña === 'URG') {
+                        sessionStorage.setItem('autenticado', 'true');
+                        localStorage.setItem('usuarioActual', usuario);
+                        estadoApp.usuarioActual = usuario;
+                        errorDiv.style.display = 'none';
+                        mostrarApp();
+                        
+                        configurarControles();
+                        establecerFechaHoy();
+                        sincronizarDatosNube();
+                    } else {
+                        errorDiv.style.display = 'block';
+                        errorDiv.textContent = '❌ Usuario o contraseña incorrectos';
+                        document.getElementById('contraseña').value = '';
+                        document.getElementById('usuario').focus();
+                    }
+                });
+            }
+        });
+
+        function verificarAutenticacion() {
+            const autenticado = sessionStorage.getItem('autenticado');
+            if (autenticado === 'true') {
+                mostrarApp();
+                configurarControles();
+                establecerFechaHoy();
+                sincronizarDatosNube();
+            } else {
+                document.getElementById('loginOverlay').style.display = 'flex';
+                document.getElementById('appContainer').style.display = 'none';
+            }
+        }
+
+        function mostrarApp() {
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('appContainer').style.display = 'block';
+        }
+
+        function cerrarSesion() {
+            sessionStorage.removeItem('autenticado');
+            localStorage.removeItem('usuarioActual');
+            location.reload();
+        }
+
+        function establecerFechaHoy() {
+            const hoy = new Date().toISOString().split('T')[0];
+            const inputFecha = document.getElementById('fecha');
+            if(inputFecha) inputFecha.value = hoy;
+        }
+
+        function configurarControles() {
+            // Turnos
+            document.querySelectorAll('.turno-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.turno-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    estadoApp.turnoSeleccionado = btn.dataset.turno;
+                });
+            });
+
+            // Categorías
+            document.querySelectorAll('.categoria-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.categoria-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    estadoApp.categoriaSeleccionada = btn.dataset.categoria;
+
+                    const subAparato = document.getElementById('subcategoriasAparato');
+                    const numPeticion = document.getElementById('numeroPeticionDiv');
+
+                    if (btn.dataset.categoria === 'Aparato') {
+                        subAparato.style.display = 'block';
+                    } else {
+                        subAparato.style.display = 'none';
+                        estadoApp.subcategoriaSeleccionada = '';
+                        estadoApp.subsubcategoriaSeleccionada = '';
+                        document.querySelectorAll('.subcategoria-btn').forEach(b => b.classList.remove('active'));
+                    }
+
+                    if (btn.dataset.categoria === 'Analítica') {
+                        numPeticion.style.display = 'block';
+                    } else {
+                        numPeticion.style.display = 'none';
+                        document.getElementById('numeroPeticion').value = '';
+                    }
+                });
+            });
+
+            // Subcategorías
+            document.querySelectorAll('.subcategoria-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.subcategoria-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    estadoApp.subcategoriaSeleccionada = btn.dataset.subcategoria;
+                    estadoApp.subsubcategoriaSeleccionada = '';
+                    
+                    // Ocultar todos los contenedores de subsubcategorías
+                    document.querySelectorAll('[id^="subsubcategoria"]').forEach(el => {
+                        el.style.display = 'none';
+                    });
+                    
+                    // Mostrar el contenedor correspondiente
+                    const subsubDiv = document.getElementById(`subsubcategoria${btn.dataset.subcategoria}`);
+                    if (subsubDiv) {
+                        subsubDiv.style.display = 'block';
+                    }
+                });
+            });
+
+            // Subsubcategorías (en formulario principal)
+            document.querySelectorAll('.subsubcategoria-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    // Solo marcamos como activo si es del nivel correcto
+                    if (!btn.dataset.subsubsubcategoria) {
+                        document.querySelectorAll('.subsubcategoria-btn:not([data-subsubsubcategoria])').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        estadoApp.subsubcategoriaSeleccionada = btn.dataset.subsubcategoria;
+                        
+                        // Mostrar/ocultar contenedores de subsubsubcategorías
+                        const subsubsubDiv = document.getElementById(`subsubsubcategoria${btn.dataset.subsubcategoria}Container`);
+                        if (subsubsubDiv) {
+                            subsubsubDiv.style.display = 'block';
+                        }
+                        document.querySelectorAll('[id^="subsubsubcategoria"][id$="Container"]').forEach(el => {
+                            if (el !== subsubsubDiv) el.style.display = 'none';
+                        });
+                    } else {
+                        // Es un nivel de equipo
+                        document.querySelectorAll('.subsubcategoria-btn[data-subsubsubcategoria]').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        estadoApp.subsubcategoriaSeleccionada = btn.dataset.subsubsubcategoria;
+                    }
+                });
+            });
+        }
+
+        // Funciones para el modal de edición
+        function switchEditTab(tab) {
+            document.querySelectorAll('.edit-tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.edit-tab').forEach(el => el.classList.remove('active'));
+            document.getElementById(`tab-${tab}`).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function configurarControlesModal() {
+            // Turnos en modal
+            document.querySelectorAll('.edit-turno-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    document.querySelectorAll('.edit-turno-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.getElementById('editTurno').value = btn.dataset.turno;
+                });
+            });
+
+            // Categorías en modal
+            document.querySelectorAll('.edit-categoria-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    document.querySelectorAll('.edit-categoria-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.getElementById('editCategoria').value = btn.dataset.categoria;
+
+                    const subDiv = document.getElementById('editSubcategoriasAparatoDiv');
+                    const numPeticionDiv = document.getElementById('editNumeroPeticionDiv');
+
+                    if (btn.dataset.categoria === 'Aparato') {
+                        subDiv.style.display = 'block';
+                        numPeticionDiv.style.display = 'none';
+                    } else if (btn.dataset.categoria === 'Analítica') {
+                        subDiv.style.display = 'none';
+                        numPeticionDiv.style.display = 'block';
+                    } else {
+                        subDiv.style.display = 'none';
+                        numPeticionDiv.style.display = 'none';
+                    }
+
+                    document.querySelectorAll('.edit-subcategoria-btn').forEach(b => b.classList.remove('active'));
+                    document.getElementById('editSubcategoria').value = '';
+                });
+            });
+
+            // Subcategorías en modal
+            document.querySelectorAll('.edit-subcategoria-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    document.querySelectorAll('.edit-subcategoria-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.getElementById('editSubcategoria').value = btn.dataset.subcategoria;
+                    
+                    // Ocultar todos
+                    document.querySelectorAll('[id^="editSubsubcategoria"]').forEach(el => {
+                        el.style.display = 'none';
+                    });
+                    
+                    // Mostrar el correcto
+                    const subsubDiv = document.getElementById(`editSubsubcategoria${btn.dataset.subcategoria}`);
+                    if (subsubDiv) {
+                        subsubDiv.style.display = 'block';
+                    }
+                });
+            });
+
+            // Subsubcategorías en modal
+            document.querySelectorAll('.edit-subsubcategoria-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (!btn.dataset.subsubsubcategoria) {
+                        document.querySelectorAll('.edit-subsubcategoria-btn:not([data-subsubsubcategoria])').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        
+                        const subsubsubDiv = document.getElementById(`editSubsubsubcategoria${btn.dataset.subsubcategoria}Container`);
+                        if (subsubsubDiv) {
+                            subsubsubDiv.style.display = 'block';
+                        }
+                        document.querySelectorAll('[id^="editSubsubsubcategoria"][id$="Container"]').forEach(el => {
+                            if (el !== subsubsubDiv) el.style.display = 'none';
+                        });
+                    } else {
+                        document.querySelectorAll('.edit-subsubcategoria-btn[data-subsubsubcategoria]').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                    }
+                });
+            });
+        }
+
+        // Sincronización en tiempo real
+        function sincronizarDatosNube() {
+            db.collection('incidencias').onSnapshot((snapshot) => {
+                estadoApp.incidencias = [];
+                snapshot.forEach((doc) => {
+                    estadoApp.incidencias.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                const configDiv = document.getElementById('firebaseConfig');
+                if(configDiv) {
+                    configDiv.innerHTML = '✅ Conectado a la nube correctamente';
+                    configDiv.className = 'config-section success';
+                }
+                renderizar();
+                actualizarWidgetUltimos3Dias();
+            }, (error) => {
+                console.error("Error al sincronizar con Firebase:", error);
+                const configDiv = document.getElementById('firebaseConfig');
+                if(configDiv) {
+                    configDiv.innerHTML = '❌ Error de conexión con la nube. Revisa las reglas de Firestore.';
+                }
+            });
+        }
+
+        // Guardar nueva incidencia
+        async function guardarIncidencia() {
+            const fecha = document.getElementById('fecha').value;
+            const turno = estadoApp.turnoSeleccionado;
+            const persona = document.getElementById('persona').value;
+            const categoria = estadoApp.categoriaSeleccionada;
+            const subcategoria = estadoApp.subcategoriaSeleccionada;
+            const subsubcategoria = estadoApp.subsubcategoriaSeleccionada;
+            const numeroPeticion = categoria === 'Analítica' ? document.getElementById('numeroPeticion').value : null;
+            const descripcion = document.getElementById('descripcion').value;
+            const comentarios = document.getElementById('comentarios').value;
+
+            if (!fecha || !turno || !persona || !categoria || !descripcion) {
+                alert('Por favor, completa todos los campos obligatorios.');
+                return;
+            }
+
+            const nuevaIncidencia = {
+                fecha,
+                turno,
+                persona,
+                categoria,
+                subcategoria: subcategoria || '',
+                subsubcategoria: subsubcategoria || '',
+                numeroPeticion: numeroPeticion || '',
+                descripcion,
+                comentarios: comentarios || '',
+                estado: 'PENDIENTE',
+                fechaCreacion: new Date().toISOString(),
+                creadoPor: 'System',
+                modificadoPor: '',
+                cerradoPor: ''
+            };
+
+            try {
+                await db.collection('incidencias').add(nuevaIncidencia);
+                document.getElementById('descripcion').value = '';
+                document.getElementById('comentarios').value = '';
+                document.getElementById('numeroPeticion').value = '';
+            } catch (error) {
+                alert('Error al guardar la incidencia: ' + error.message);
+            }
+        }
+
+        // Equipos disponibles por subcategoría (para el filtro)
+        const equiposPorSubcategoria = {
+            'Coagulación': ['Coagulómetro 1', 'Coagulómetro 2'],
+            'Gasómetros': ['Gasómetro 1', 'Gasómetro 2']
+        };
+
+        function actualizarFiltroSubcategoria() {
+            const categoria = document.getElementById('filtroCategoria').value;
+            const subDiv = document.getElementById('filtroSubcategoriaDiv');
+            const subSelect = document.getElementById('filtroSubcategoria');
+
+            if (categoria === 'Aparato') {
+                subDiv.style.display = 'block';
+            } else {
+                subDiv.style.display = 'none';
+                subSelect.value = '';
+            }
+            actualizarFiltroSubsubcategoria();
+        }
+
+        function actualizarFiltroSubsubcategoria() {
+            const subcategoria = document.getElementById('filtroSubcategoria').value;
+            const subsubDiv = document.getElementById('filtroSubsubcategoriaDiv');
+            const subsubSelect = document.getElementById('filtroSubsubcategoria');
+
+            const equipos = equiposPorSubcategoria[subcategoria];
+            if (equipos) {
+                subsubSelect.innerHTML = '<option value="">Todos</option>' +
+                    equipos.map(eq => `<option value="${eq}">${eq}</option>`).join('');
+                subsubDiv.style.display = 'block';
+            } else {
+                subsubSelect.innerHTML = '<option value="">Todos</option>';
+                subsubDiv.style.display = 'none';
+            }
+        }
+
+        // Renderizar lista
+        function renderizar() {
+            const lista = document.getElementById('incidenciasList');
+            if(!lista) return;
+
+            const searchVal = document.getElementById('filtroSearch').value.toLowerCase();
+            const ordenVal = document.getElementById('filtroOrdenacion').value;
+            const estadoVal = document.getElementById('filtroEstado').value;
+            const categoriaVal = document.getElementById('filtroCategoria').value;
+            const subcategoriaVal = document.getElementById('filtroSubcategoria').value;
+            const subsubcategoriaVal = document.getElementById('filtroSubsubcategoria').value;
+
+            let filtradas = estadoApp.incidencias.filter(inc => {
+                const matchSearch = (inc.descripcion || '').toLowerCase().includes(searchVal) || 
+                                    (inc.persona || '').toLowerCase().includes(searchVal);
+                const matchEstado = estadoVal === "" || inc.estado === estadoVal;
+                const matchCategoria = categoriaVal === "" || inc.categoria === categoriaVal;
+                const matchSubcategoria = subcategoriaVal === "" || inc.subcategoria === subcategoriaVal;
+                const matchSubsubcategoria = subsubcategoriaVal === "" || inc.subsubcategoria === subsubcategoriaVal;
+                return matchSearch && matchEstado && matchCategoria && matchSubcategoria && matchSubsubcategoria;
+            });
+
+            filtradas.sort((a, b) => {
+                const fechaA = a.fechaCreacion || a.fecha;
+                const fechaB = b.fechaCreacion || b.fecha;
+                const timestampA = new Date(fechaA).getTime() || 0;
+                const timestampB = new Date(fechaB).getTime() || 0;
+                return ordenVal === 'reciente' ? timestampB - timestampA : timestampA - timestampB;
+            });
+
+            document.getElementById('statTotal').innerText = estadoApp.incidencias.length;
+            document.getElementById('statPendiente').innerText = estadoApp.incidencias.filter(i => i.estado === 'PENDIENTE').length;
+
+            if (filtradas.length === 0) {
+                lista.innerHTML = '<div class="loading" style="color:#666;">No hay incidencias registradas.</div>';
+                return;
+            }
+
+            let html = '';
+            filtradas.forEach(inc => {
+                const esCerrado = inc.estado === 'CERRADO';
+                const fechaFormateada = formatearFecha(inc.fecha);
+                
+                let auditoria = '';
+                if (inc.creadoPor) {
+                    auditoria += `<div class="tarjeta-auditoria">📌 Creada por: ${inc.creadoPor}</div>`;
+                }
+                if (inc.modificadoPor) {
+                    auditoria += `<div class="tarjeta-auditoria">✏️ Modificada por: ${inc.modificadoPor}</div>`;
+                }
+                if (inc.cerradoPor) {
+                    auditoria += `<div class="tarjeta-auditoria">✅ Cerrada por: ${inc.cerradoPor}</div>`;
+                }
+
+                html += `
+                    <div class="tarjeta-incidencia ${esCerrado ? 'cerrado' : ''}">
+                        <div class="tarjeta-select-container">
+                            <input type="checkbox" class="check-incidencia" value="${inc.id}">
+                        </div>
+                        <div class="tarjeta-header">
+                            <div>
+                                <span class="tarjeta-fecha">📅 ${fechaFormateada}</span>
+                                <span class="tarjeta-turno">(${inc.turno})</span>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 8px;">
+                            <span class="tarjeta-estado ${esCerrado ? 'estado-cerrado' : 'estado-pendiente'}">${inc.estado}</span>
+                        </div>
+                        <div class="tarjeta-persona">👤 ${inc.persona}</div>
+                        <div>
+                            <span class="tarjeta-categoria">📌 ${inc.categoria}</span>
+                            ${inc.categoria === 'Aparato' && inc.subcategoria ? `<span class="tarjeta-subcategoria">⚙️ ${inc.subcategoria}</span>` : ''}
+                            ${inc.categoria === 'Aparato' && inc.subsubcategoria ? `<span class="tarjeta-subsubcategoria">🔹 ${inc.subsubcategoria}</span>` : ''}
+                            ${inc.categoria === 'Analítica' && inc.numeroPeticion ? `<span class="tarjeta-peticion">🔢 Nº Petición: ${inc.numeroPeticion}</span>` : ''}
+                        </div>
+                        <div class="tarjeta-descripcion"><strong>Incidencia:</strong> ${inc.descripcion}</div>
+                        ${inc.comentarios ? `<div class="tarjeta-comentarios">💬 <strong>Comentarios:</strong> ${inc.comentarios}</div>` : ''}
+                        ${auditoria}
+                        <div class="botones-accion">
+                            <button class="btn-small btn-edit" onclick="abrirModal('${inc.id}')">✏️ Editar / Estado</button>
+                            <button class="btn-small btn-delete" onclick="eliminarIncidencia('${inc.id}')">🗑️ Eliminar</button>
+                        </div>
+                    </div>
+                `;
+            });
+            lista.innerHTML = html;
+        }
+
+        // Selección masiva
+        function toggleSeleccionarTodo(masterCheckbox) {
+            const checkboxes = document.querySelectorAll('.check-incidencia');
+            checkboxes.forEach(cb => {
+                cb.checked = masterCheckbox.checked;
+            });
+        }
+
+        async function eliminarSeleccionadas() {
+            const checkboxesSeleccionados = document.querySelectorAll('.check-incidencia:checked');
+            if (checkboxesSeleccionados.length === 0) {
+                alert('Por favor, selecciona al menos una incidencia para eliminar.');
+                return;
+            }
+
+            if (confirm(`¿Estás seguro de que deseas eliminar las ${checkboxesSeleccionados.length} incidencias seleccionadas?`)) {
+                try {
+                    const batch = db.batch();
+                    checkboxesSeleccionados.forEach(cb => {
+                        const docRef = db.collection('incidencias').doc(cb.value);
+                        batch.delete(docRef);
+                    });
+                    await batch.commit();
+                    document.getElementById('seleccionarTodo').checked = false;
+                } catch (error) {
+                    alert('Error al eliminar las incidencias: ' + error.message);
+                }
+            }
+        }
+
+        async function eliminarTodasLasIncidencias() {
+            if (estadoApp.incidencias.length === 0) {
+                alert('No hay incidencias registradas para eliminar.');
+                return;
+            }
+
+            const confirmacion1 = prompt(`⚠️ ADVERTENCIA: Estás a punto de borrar TODAS las ${estadoApp.incidencias.length} incidencias de la base de datos.\n\nEscribe la palabra "ELIMINAR" en mayúsculas para confirmar:`);
+            
+            if (confirmacion1 !== "ELIMINAR") {
+                alert('Operación cancelada. No se ha borrado ninguna incidencia.');
+                return;
+            }
+
+            try {
+                const batchSize = 400;
+                const docs = await db.collection('incidencias').get();
+                
+                for (let i = 0; i < docs.size; i += batchSize) {
+                    const batch = db.batch();
+                    const chunk = docs.docs.slice(i, i + batchSize);
+                    chunk.forEach(docSnap => {
+                        batch.delete(docSnap.ref);
+                    });
+                    await batch.commit();
+                }
+
+                alert('✅ Todas las incidencias han sido eliminadas correctamente.');
+            } catch (error) {
+                alert('Error al eliminar todas las incidencias: ' + error.message);
+            }
+        }
+
+        // Funciones de edición
+        function abrirModal(id) {
+            const inc = estadoApp.incidencias.find(i => i.id === id);
+            if (!inc) return;
+            estadoApp.incidenciaEnEdicion = inc;
+
+            // Cargar campos básicos
+            document.getElementById('editFecha').value = inc.fecha || '';
+            document.getElementById('editPersona').value = inc.persona || '';
+            document.getElementById('editDescripcion').value = inc.descripcion || '';
+            document.getElementById('editComentarios').value = inc.comentarios || '';
+            document.getElementById('editEstado').value = inc.estado || 'PENDIENTE';
+
+            // Cargar turno
+            const turnoBtn = document.querySelector(`.edit-turno-btn[data-turno="${inc.turno}"]`);
+            if (turnoBtn) {
+                document.querySelectorAll('.edit-turno-btn').forEach(b => b.classList.remove('active'));
+                turnoBtn.classList.add('active');
+            }
+            document.getElementById('editTurno').value = inc.turno || '';
+
+            // Cargar categoría
+            const categoriaBtn = document.querySelector(`.edit-categoria-btn[data-categoria="${inc.categoria}"]`);
+            if (categoriaBtn) {
+                document.querySelectorAll('.edit-categoria-btn').forEach(b => b.classList.remove('active'));
+                categoriaBtn.classList.add('active');
+            }
+            document.getElementById('editCategoria').value = inc.categoria || '';
+
+            // Mostrar/ocultar subcategorías
+            const subDiv = document.getElementById('editSubcategoriasAparatoDiv');
+            const numPeticionDiv = document.getElementById('editNumeroPeticionDiv');
+            
+            if (inc.categoria === 'Aparato') {
+                subDiv.style.display = 'block';
+                numPeticionDiv.style.display = 'none';
+                
+                const subBtn = document.querySelector(`.edit-subcategoria-btn[data-subcategoria="${inc.subcategoria}"]`);
+                if (subBtn) {
+                    document.querySelectorAll('.edit-subcategoria-btn').forEach(b => b.classList.remove('active'));
+                    subBtn.classList.add('active');
+                }
+                document.getElementById('editSubcategoria').value = inc.subcategoria || '';
+
+                // Cargar subsubcategoría
+                if (inc.subsubcategoria) {
+                    const subsubBtn = document.querySelector(`.edit-subsubcategoria-btn[data-subsubcategoria="${inc.subsubcategoria}"], .edit-subsubcategoria-btn[data-subsubsubcategoria="${inc.subsubcategoria}"]`);
+                    if (subsubBtn) {
+                        document.querySelectorAll('.edit-subsubcategoria-btn').forEach(b => b.classList.remove('active'));
+                        subsubBtn.classList.add('active');
+                    }
+                }
+            } else if (inc.categoria === 'Analítica') {
+                subDiv.style.display = 'none';
+                numPeticionDiv.style.display = 'block';
+                document.getElementById('editNumeroPeticion').value = inc.numeroPeticion || '';
+            } else {
+                subDiv.style.display = 'none';
+                numPeticionDiv.style.display = 'none';
+            }
+
+            // Cargar información de auditoría
+            document.getElementById('infoCreada').textContent = `Creada por: ${inc.creadoPor || 'Sistema'}`;
+            if (inc.modificadoPor) {
+                document.getElementById('infoModificada').textContent = `Modificada por: ${inc.modificadoPor}`;
+            }
+            if (inc.cerradoPor) {
+                document.getElementById('infoCerrada').style.display = 'block';
+                document.getElementById('infoCerrada').textContent = `Cerrada por: ${inc.cerradoPor}`;
+            } else {
+                document.getElementById('infoCerrada').style.display = 'none';
+            }
+
+            document.getElementById('modalEdicion').classList.add('active');
+            configurarControlesModal();
+        }
+
+        function cerrarModal() {
+            document.getElementById('modalEdicion').classList.remove('active');
+            estadoApp.incidenciaEnEdicion = null;
+        }
+
+        async function guardarEdicion(e) {
+            e.preventDefault();
+            if (!estadoApp.incidenciaEnEdicion) return;
+
+            const id = estadoApp.incidenciaEnEdicion.id;
+            const fecha = document.getElementById('editFecha').value;
+            const turno = document.getElementById('editTurno').value;
+            const persona = document.getElementById('editPersona').value;
+            const categoria = document.getElementById('editCategoria').value;
+            const subcategoria = document.getElementById('editSubcategoria').value;
+            const subsubcategoria = estadoApp.incidenciaEnEdicion.subsubcategoria || '';
+            const numeroPeticion = document.getElementById('editNumeroPeticion').value;
+            const descripcion = document.getElementById('editDescripcion').value;
+            const comentarios = document.getElementById('editComentarios').value;
+            const estado = document.getElementById('editEstado').value;
+            const modificadoPor = document.getElementById('editModificadoPor').value;
+
+            if (!fecha || !turno || !persona || !categoria || !descripcion) {
+                alert('Por favor, completa todos los campos obligatorios.');
+                return;
+            }
+
+            if (!modificadoPor) {
+                alert('Por favor, selecciona quién realiza este cambio en la pestaña de Modificación.');
+                return;
+            }
+
+            let hora = '12:00:00';
+            if (turno === 'Tarde') hora = '17:00:00';
+            else if (turno === 'Noche' || turno === 'Finde N.') hora = '23:00:00';
+            const nuevaFechaCreacion = `${fecha}T${hora}`;
+
+            const updateData = {
+                fecha,
+                turno,
+                persona,
+                categoria,
+                subcategoria: subcategoria || '',
+                subsubcategoria: subsubcategoria || '',
+                numeroPeticion: numeroPeticion || '',
+                descripcion,
+                comentarios,
+                estado,
+                fechaCreacion: nuevaFechaCreacion,
+                modificadoPor: modificadoPor,
+                ultimaModificacion: new Date().toISOString()
+            };
+
+            // Si el estado es CERRADO, registrar quién lo cierra
+            if (estado === 'CERRADO' && estadoApp.incidenciaEnEdicion.estado === 'PENDIENTE') {
+                updateData.cerradoPor = modificadoPor;
+                updateData.fechaCierre = new Date().toISOString();
+            }
+
+            try {
+                await db.collection('incidencias').doc(id).update(updateData);
+                cerrarModal();
+            } catch (error) {
+                alert('Error al actualizar: ' + error.message);
+            }
+        }
+
+        async function eliminarIncidencia(id) {
+            if (confirm('¿Estás seguro de que deseas eliminar esta incidencia?')) {
+                try {
+                    await db.collection('incidencias').doc(id).delete();
+                } catch (error) {
+                    alert('Error al eliminar: ' + error.message);
+                }
+            }
+        }
+
+        // Exportar a Excel (actualizado)
+        function exportarExcel() {
+            if (estadoApp.incidencias.length === 0) {
+                alert('No hay incidencias para exportar.');
+                return;
+            }
+            const datosExportar = estadoApp.incidencias.map(i => ({
+                Fecha: formatearFecha(i.fecha),
+                Turno: i.turno,
+                Persona: i.persona,
+                Categoría: i.categoria,
+                Subcategoría: i.subcategoria || '',
+                Subsubcategoría: i.subsubcategoria || '',
+                'Nº Petición': i.numeroPeticion || '',
+                Descripción: i.descripcion,
+                Comentarios: i.comentarios || '',
+                Estado: i.estado,
+                'Creada por': i.creadoPor || '',
+                'Modificada por': i.modificadoPor || '',
+                'Cerrada por': i.cerradoPor || ''
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(datosExportar);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Incidencias");
+            XLSX.writeFile(workbook, "Parte_Guardias_Urgencias.xlsx");
+        }
+
+        // Importar desde Excel (actualizado)
+        async function importarExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const json = XLSX.utils.sheet_to_json(worksheet);
+
+                    if (json.length === 0) {
+                        alert('El archivo Excel está vacío.');
+                        return;
+                    }
+
+                    const batch = db.batch();
+                    json.forEach(row => {
+                        const nuevaRef = db.collection('incidencias').doc();
+                        
+                        let fechaStr = row.Fecha || new Date().toISOString().split('T')[0];
+                        let fechaCreacionStr = new Date().toISOString();
+                        
+                        if (fechaStr.includes('T')) {
+                            fechaCreacionStr = fechaStr;
+                            fechaStr = fechaStr.split('T')[0];
+                        }
+                        
+                        batch.set(nuevaRef, {
+                            fecha: fechaStr,
+                            turno: row.Turno || 'Mañana',
+                            persona: row.Persona || 'Otro',
+                            categoria: row.Categoría || 'Otro',
+                            subcategoria: row.Subcategoría || '',
+                            subsubcategoria: row.Subsubcategoría || '',
+                            numeroPeticion: row['Nº Petición'] || '',
+                            descripcion: row.Descripción || 'Importado de Excel',
+                            comentarios: row.Comentarios || '',
+                            estado: row.Estado || 'PENDIENTE',
+                            fechaCreacion: fechaCreacionStr,
+                            creadoPor: row['Creada por'] || 'Import',
+                            modificadoPor: row['Modificada por'] || '',
+                            cerradoPor: row['Cerrada por'] || ''
+                        });
+                    });
+
+                    await batch.commit();
+                    const banner = document.getElementById('bannerImport');
+                    if(banner) {
+                        banner.style.display = 'block';
+                        setTimeout(() => { banner.style.display = 'none'; }, 4000);
+                    }
+                } catch (error) {
+                    alert('Error al procesar el archivo Excel: ' + error.message);
+                }
+                event.target.value = '';
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    </script>
+</body>
+</html>
